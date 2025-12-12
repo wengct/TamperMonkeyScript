@@ -2,7 +2,7 @@
 // @name         Azure DevOps PR Thread Collapsible
 // @source       https://github.com/wengct/TamperMonkeyScript/raw/main/AzureDevOpsService/AzureDevOpsPrThreadCollapsible.user.js
 // @namespace    https://github.com/wengct/TamperMonkeyScript/raw/main/AzureDevOpsService/AzureDevOpsPrThreadCollapsible.user.js
-// @version      1.0.0
+// @version      1.0.1
 // @description  Safely collapsible PR thread without breaking Azure DevOps layout
 // @match        https://dev.azure.com/*
 // @match        https://*.visualstudio.com/*
@@ -15,9 +15,11 @@
     'use strict';
 
     const THREAD_SELECTOR = ".repos-comment-card";
+    const PREVIEW_HEIGHT = 220; // 👈 摘要高度（px，可自行調整）
 
     function injectStyles() {
         const css = `
+        /* ===== Toggle Button ===== */
         .fold-toggle {
             padding: 2px 6px;
             margin-bottom: 4px;
@@ -27,11 +29,29 @@
             border: 1px solid #ccc;
             border-radius: 4px;
         }
-        .fold-toggle.collapsed::after { content: " ▶️"; }
         .fold-toggle::after { content: " 🔽"; }
+        .fold-toggle.collapsed::after { content: " ▶️"; }
 
+        /* ===== Preview (Collapsed) Mode ===== */
         .fold-target.fold-collapsed {
-            display: none !important;
+            max-height: ${PREVIEW_HEIGHT}px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 底部淡出提示 */
+        .fold-target.fold-collapsed::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 40px;
+            background: linear-gradient(
+                rgba(255,255,255,0),
+                rgba(255,255,255,1)
+            );
+            pointer-events: none;
         }
         `;
         const styleEl = document.createElement("style");
@@ -44,28 +64,31 @@
             if (card.dataset.foldApplied) return;
             card.dataset.foldApplied = "1";
 
-            // 找到真正的內容容器（安全摺疊的部分）
+            // 🔑 真正安全可摺疊的內容區
             const viewer = card.querySelector(".repos-comment-viewer");
             if (!viewer) return;
 
-            viewer.classList.add("fold-target");
+            viewer.classList.add("fold-target", "fold-collapsed");
 
-            // 建立按鈕並放在同一區塊上方 → 不破壞佈局
-            const toggle = document.createElement("button");
-            toggle.className = "fold-toggle";
-            toggle.textContent = "詳細";
-            toggle.title = "展開或摺疊留言";
-
-
-            // 插入 bolt-card-content 顯示區塊中（安全位置）
+            // 放置按鈕的安全區（不破壞 layout）
             const headerArea = card.querySelector(".bolt-card-content");
             if (!headerArea) return;
+
+            const toggle = document.createElement("button");
+            toggle.className = "fold-toggle collapsed";
+            toggle.textContent = "詳細";
+            toggle.title = "點擊可展開或收合完整內容";
 
             headerArea.insertBefore(toggle, headerArea.firstChild);
 
             toggle.addEventListener("click", () => {
                 viewer.classList.toggle("fold-collapsed");
                 toggle.classList.toggle("collapsed");
+
+                // 動態 tooltip
+                toggle.title = viewer.classList.contains("fold-collapsed")
+                    ? "點擊可展開完整內容"
+                    : "點擊可收合為摘要";
             });
         });
     }
@@ -73,6 +96,7 @@
     injectStyles();
     enhanceThreads();
 
+    // 支援動態載入（PR 切換、lazy load）
     const observer = new MutationObserver(() => enhanceThreads());
     observer.observe(document.body, { childList: true, subtree: true });
 
