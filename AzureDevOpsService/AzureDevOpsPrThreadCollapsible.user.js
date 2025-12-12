@@ -2,7 +2,7 @@
 // @name         Azure DevOps PR Thread Collapsible
 // @source       https://github.com/wengct/TamperMonkeyScript/raw/main/AzureDevOpsService/AzureDevOpsPrThreadCollapsible.user.js
 // @namespace    https://github.com/wengct/TamperMonkeyScript/raw/main/AzureDevOpsService/AzureDevOpsPrThreadCollapsible.user.js
-// @version      1.0.1
+// @version      1.0.2
 // @description  Safely collapsible PR thread without breaking Azure DevOps layout
 // @match        https://dev.azure.com/*
 // @match        https://*.visualstudio.com/*
@@ -15,7 +15,7 @@
     'use strict';
 
     const THREAD_SELECTOR = ".repos-comment-card";
-    const PREVIEW_HEIGHT = 220; // 👈 摘要高度（px，可自行調整）
+    const PREVIEW_HEIGHT = 150; // ← 摘要高度（px，可自行調整）
 
     function injectStyles() {
         const css = `
@@ -32,15 +32,15 @@
         .fold-toggle::after { content: " 🔽"; }
         .fold-toggle.collapsed::after { content: " ▶️"; }
 
-        /* ===== Preview (Collapsed) Mode ===== */
-        .fold-target.fold-collapsed {
+        /* ===== Preview Mode (關鍵：只裁 markdown-content) ===== */
+        .fold-target.fold-collapsed .markdown-content {
             max-height: ${PREVIEW_HEIGHT}px;
             overflow: hidden;
             position: relative;
         }
 
-        /* 底部淡出提示 */
-        .fold-target.fold-collapsed::after {
+        /* 底部淡出提示（視覺告知還有內容） */
+        .fold-target.fold-collapsed .markdown-content::after {
             content: "";
             position: absolute;
             left: 0;
@@ -64,20 +64,20 @@
             if (card.dataset.foldApplied) return;
             card.dataset.foldApplied = "1";
 
-            // 🔑 真正安全可摺疊的內容區
+            // 🔑 真正安全的內容容器
             const viewer = card.querySelector(".repos-comment-viewer");
             if (!viewer) return;
 
             viewer.classList.add("fold-target", "fold-collapsed");
 
-            // 放置按鈕的安全區（不破壞 layout）
+            // 🔑 安全插入按鈕的位置（不破壞 layout）
             const headerArea = card.querySelector(".bolt-card-content");
             if (!headerArea) return;
 
             const toggle = document.createElement("button");
             toggle.className = "fold-toggle collapsed";
             toggle.textContent = "詳細";
-            toggle.title = "點擊可展開或收合完整內容";
+            toggle.title = "點擊可展開完整內容";
 
             headerArea.insertBefore(toggle, headerArea.firstChild);
 
@@ -85,7 +85,6 @@
                 viewer.classList.toggle("fold-collapsed");
                 toggle.classList.toggle("collapsed");
 
-                // 動態 tooltip
                 toggle.title = viewer.classList.contains("fold-collapsed")
                     ? "點擊可展開完整內容"
                     : "點擊可收合為摘要";
@@ -96,7 +95,7 @@
     injectStyles();
     enhanceThreads();
 
-    // 支援動態載入（PR 切換、lazy load）
+    // 支援動態載入（PR 切換、Lazy load）
     const observer = new MutationObserver(() => enhanceThreads());
     observer.observe(document.body, { childList: true, subtree: true });
 
